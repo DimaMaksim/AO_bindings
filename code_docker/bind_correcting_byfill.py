@@ -36,72 +36,78 @@ class calculate():
         self.con_msp = pyodbc.connect(driver=self.driver,server='kvcen15-sqls003.officekiev.fozzy.lan\heavy003',database='dwhclientAnalytics',\
                     uid='j-importOrders-controller',pwd='Mb1ygZywkGxi8ZQLbVeb')
 
-    def get_articules(self):
-        query=f"SELECT distinct [LagerId],FilialId as FilId\
-             FROM [SalesHub.Dev].[DataHub].[v_SalesStores] \
-             where date between {self.start} and {self.end} and \
-        	 FilialId={self.FilId} order by FilialId, LagerId"
-        df = pd.read_sql_query(query,self.con_SalesHub )
-        return df
     def get_ssl(self):
         query=f"SELECT Lagerid as lagerid,SSL FROM [InventorySimul].[dbo].[Z_SSL]\
-                where Filid={self.FilId}"
+                 where Filid={self.FilId}"
         df = pd.read_sql_query(query,self.con_SalesHub )
 
         return df
-    def get_sales(self,articule):
-        sql = f"select  QtySales, \
+    def get_sales(self):
+        sql = f"select lagerid,QtySales, \
                 StoreQtyDefault,\
                 PriceOut,\
                 ActivityId\
                 from [SalesHub.Dev].[DataHub].[v_SalesStores] \
-                where LagerId={articule}\
-                and FilialId ={self.FilId}\
-                and [Date]>={self.start} and [Date]<={self.end}\
-                order by [Date]"
+                where [Date]>={self.start} and [Date]<={self.end}\
+                and FilialId ={self.FilId}"
         df = pd.read_sql_query(sql,self.con_SalesHub)
         return df
     def get_rasf(self):
         query = f"SELECT A.lagerid as lagerid,B.rasf as rasf FROM [4t.Dev].[4t].[rasf] as A\
-                join [4t.Dev].[4t].[rasfid] as B on A.rasfid=B.rasfid\
-                where A.filid={self.FilId}"
+             join [4t.Dev].[4t].[rasfid] as B on A.rasfid=B.rasfid\
+             where A.filid={self.FilId}"
         df = pd.read_sql_query(query, self.con_SalesHub)
         return df
-    def get_Godnost(self,articule):
-        sql=f"SELECT[UsedByDay] FROM [InventorySimul].[dbo].[GodnostDays] where lagerid={articule}"
-        df=pd.read_sql_query(sql,self.con_SalesHub)
-        return df
 
-    def getMacroid(self,articule):
-        sql=f"select [lagerMacroID]  from [MasterData].[sku].[Lagers] \
-                where lagerId = {articule}"
-        df = pd.read_sql_query(sql, self.con_Master)
-        return df.iloc[0].values.item()
-    
 
     def get_mspbyFil(self):
         sql=f"exec [etl].[proc_getMSPbyFil] ?,?,?"
         df=pd.read_sql_query(sql,params=(self.FilId,self.start[1:-1],self.end[1:-1]),con=self.con_msp)
+        df.rename(columns={'lagerId':'lagerid','avgMSP':'msp'},inplace=True)
+        return df
+
+    def get_macro_godn(self):
+        sql=f"SELECT a.[lagerId] as lagerid, a.[lagerMacroID] as macroid ,b.UsedByDay as godnost FROM [MasterData].[sku].[Lagers] as a\
+               inner join [InventorySimul].[dbo].[GodnostDays] as b on a.lagerId=b.LagerId "
+        df = pd.read_sql_query(sql, self.con_Master)
         return df
 
 
 import sys
 
 def forecast(FilId,start,end):
+
     a=calculate("'"+start+"'","'"+ end +"'",FilId)
-    #msp_all=a.get_mspbyFil()
-
-
-    #ssl_all=a.get_ssl()
+    sales_all=a.get_sales()
+    print("sales_all OK")
+    sales_all[['QtySales','StoreQtyDefault']]=sales_all[['QtySales','StoreQtyDefault']].fillna(0)
+    sales_all.StoreQtyDefault[sales_all.StoreQtyDefault.values<0]=0
+    sales_all=sales_all[sales_all.ActivityId.isnull()]
+    lagers=sales_all.lagerid.unique()
+    lagers=pd.DataFrame(data=lagers,columns=['lagerid'])
+    msp_all=a.get_mspbyFil()
+    ssl_all=a.get_ssl()
     rasf_all=a.get_rasf()
-    print(rasf_all)
-    sys.exit()
-    print("Filial: ",FilId,len(lagers_all))
+
+    macro_all=a.get_macro_godn()
+    lagers_info=lagers.merge(msp_all,how='left',on='lagerid')
+    lagers_info=lagers_info.merge(ssl_all,how='left',on='lagerid')
+    lagers_info=lagers_info.merge(rasf_all,how='left',on='lagerid')
+    lagers_info=lagers_info.merge(macro_all,how='left',on='lagerid')
+    lagers_info.rasf.fillna(1,inplace=True)
+    lagers_info.godnost.fillna(0,inplace=True)
+    lagers_info.godnost[lagers_info.godnost==0]=366
+    lagers_info.SSL.fillna(50,inplace=True)
+    lagers_info.msp.fillna(1,inplace=True)
+
     # исключение элитки:
     elitka=pd.read_csv('elitka.csv',sep=";")
+    elitka.rename(columns={'LageId':'lagerid'},inplace=True)
     elitka=elitka[elitka.filid==FilId]
-    df_all = lagers_all.merge(elitka, left_on=['LagerId'],right_on=['lagerid'],how='left', indicator=True)
-    lagers=df_all[df_all._merge=='left_only']['LagerId'].values
+
+    df_all = lagers.merge(elitka, on=['lagerid'],how='left', indicator=True)
+    lagers=df_all[df_all._merge=='left_only']['lagerid'].values
+
     with open('model_5_filials.pickle',"br") as f:
         model_5_filials=pickle.load(f)
     k=0
@@ -109,13 +115,12 @@ def forecast(FilId,start,end):
     for lager in lagers:
         k+=1;print(FilId,k)
         smallsales=0
-        data0=a.get_sales(lager)
-        data0[['QtySales','StoreQtyDefault']]=data0[['QtySales','StoreQtyDefault']].fillna(0)
-        data0.StoreQtyDefault[data0.StoreQtyDefault.values<0]=0
-        data=data0[data0.ActivityId.isnull()].values
-        sal=data[:,0]
-        stock=data[:,1]
-        price=data[:,2]
+        data=sales_all[sales_all.lagerid==lager].values
+        sal,stock,price=data[:,1],data[:,2],data[:,3]
+        #data0[['QtySales','StoreQtyDefault']]=data0[['QtySales','StoreQtyDefault']].fillna(0)
+        #data0.StoreQtyDefault[data0.StoreQtyDefault.values<0]=0
+        #data=data0[data0.ActivityId.isnull()].values
+
         if len(data)>15:
             SalesQuantReal_mean=sal.mean()
             if SalesQuantReal_mean!=0:
@@ -126,42 +131,19 @@ def forecast(FilId,start,end):
                 SalesDiff=np.absolute(np.diff(sal)).mean()
                 VarianceRealSales=sal.std()/SalesQuantReal_mean
                 Turnover_real=stock.mean()/SalesQuantReal_mean
-                Rasf=rasf_all[rasf_all.lagerid==lager].rasf
-                if len(Rasf)==0:
-                    Rasf=1
-                else:
-                    if len(Rasf.values)==1:
-                        Rasf=float(Rasf.values.item())
-                    else:
-                        Rasf=float(Rasf.values[0].item())
-
+                inf=lagers_info[lagers_info.lagerid==lager].values[0,:]
+                Msp_mean,SSL,Rasf,macroId,ShelfLife=inf[1],inf[2],inf[3],inf[5],inf[5]
                 Rsf_Sale=Rasf/SalesQuantReal_mean
-                godnost=a.get_Godnost(lager)
-                ShelfLife=float(godnost.values.item()) if len( godnost)!=0 else 366
-                try:
-                    PriceMedian=np.median(price)
-                except:
-                    continue
-                SSL=ssl_all[ssl_all.lagerid==lager].SSL
-                if len(SSL)==0:
-                    SSL=50
-                else:
-                    if len(SSL.values)==1:
-                        SSL=float(SSL.values.item())
-                    else:
-                        SSL=float(SSL.values[0].item())
+                PriceMedian=np.median(price)
 
-                macroId=a.getMacroid(lager)
-                msp=msp_all[msp_all.lagerId==lager].avgMSP
-                Msp_mean=msp.values.item() if len(msp)!=0 else 1
-
-                res=[SalesQuantReal_mean,Turnover_real,SalesDiff,Rsf_Sale,SSL,PriceMedian,\
-                                    Msp_mean,ShelfLife,VarianceRealSales,macroId]
+                res=np.array([SalesQuantReal_mean,Turnover_real,SalesDiff,Rsf_Sale,SSL,PriceMedian,\
+                                    Msp_mean,ShelfLife,VarianceRealSales,macroId],dtype=float)
                 repl_dict={"0":"AOEngine07","1":"AOEngine06","2":"AOEngine02"}
 
                 cols=['SalesQuantReal_mean', 'Turnover_real', 'SalesDiff', 'Rsf_Sale', 'SSL',\
                    'PriceMedian', 'Msp_mean', 'ShelfLife', 'VarianceRealSales', 'macroId']
                 recalc=pd.DataFrame.from_dict({"s":res},orient='index',columns=cols)
+
                 clust=model_5_filials.predict(recalc).item()
                 engine=repl_dict[clust]
                 if smallsales==1:

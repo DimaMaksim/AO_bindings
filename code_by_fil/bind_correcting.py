@@ -45,39 +45,7 @@ class calculate():
                 where A.filid={self.FilId}"
         df = pd.read_sql_query(query, self.con_SalesHub)
         return df
-    def get_Godnost(self,articule):
-        sql=f"SELECT[UsedByDay] FROM [InventorySimul].[dbo].[GodnostDays] where lagerid={articule}"
-        df=pd.read_sql_query(sql,self.con_SalesHub)
-        return df
 
-    def getMacroid(self,articule):
-        sql=f"select [lagerMacroID]  from [MasterData].[sku].[Lagers] \
-                where lagerId = {articule}"
-        df = pd.read_sql_query(sql, self.con_Master)
-        return df.iloc[0].values.item()
-    def ZPandSL(self,articule):
-        def get_ZP(articule):
-            query = f"SELECT ZP,SSL FROM [InventorySimul].[dbo].[ZPandSL]\
-                    where Filid={self.FilId} and Lagerid= {articule}"
-            df = pd.read_sql_query(query,self.con_SalesHub)
-            return df
-        r=get_ZP(articule)
-        if len(r)==0:
-            return 50
-        else:
-            r=r.values[0]
-            r1,r3=r[0],r[1]
-            if (r1==None)and(r3==None):
-                #z=norm.ppf(SSL)
-                #return (z,SSL*100)
-                return 50
-            elif (r1!=None)and(r3==None):
-                r1=float(r1)
-                r3=norm.cdf(r1)*100
-            elif (r1==None)and(r3!=None):
-                r3=float(r3)
-                r1=norm.ppf(r3*0.01)
-            return float(r3)
 
     def get_mspbyFil(self):
         sql=f"exec [etl].[proc_getMSPbyFil] ?,?,?"
@@ -153,7 +121,6 @@ def getSampleforTrain(FilId,start,end):
                 if np.count_nonzero(sal)<15:
                     smallsales=np.append(smallsales,[lager])
                 SalesDiff=np.absolute(np.diff(sal)).mean()
-
                 VarianceRealSales=sal.std()/SalesQuantReal_mean
                 Turnover_real=stock.mean()/SalesQuantReal_mean
                 inf=lagers_info[lagers_info.lagerid==lager].values[0,:]
@@ -259,9 +226,9 @@ model=r'c:\Users\dm.maksymenko\Python\AOEngine_bind\code\model_5_filials.pickle'
 
 if __name__ == "__main__":
     #getSampleforTrain(2025,start,end)
-    #CompAll(args)
+    CompAll(args)
     #Compute(2269,start, end)
-    Concat()
+    #Concat()
 
     #start="2020-02-08"; end="2020-03-08"
 
