@@ -1,0 +1,10 @@
+
+
+/**/*.xls
+/**/*.xlsx
+/**/*.csv
+/code/dataset_for_train_with_elit.pickle
+/code_by_fil/dataset_for_train_with_elit.pickle
+/code_docker/elitka.csv
+
+data/

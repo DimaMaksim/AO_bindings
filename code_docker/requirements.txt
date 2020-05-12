@@ -1,0 +1,10 @@
+
+pika
+numpy
+pandas
+pyodbc
+pyyaml
+xgboost==0.90
+sklearn
+
+#docker tag forecastbindingsrecalculate registry.fozzy.lan/calcengine/forecastbindingsrecalculate

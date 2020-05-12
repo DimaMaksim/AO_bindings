@@ -1,0 +1,18 @@
+rabbit0:
+  in_queue: DigitalCore.jobs.atomgen
+  out_queue: DigitalCore.jobs.macrogen
+  host: sftv-othe031.fz.fozzy.lan
+  port: 5672
+  vhost: simdev
+  user: sim_dev_user
+  pwd: simdev
+
+
+rabbit:
+  in_queue: in_forecastbindings
+  out_queue: out_forecastbindings
+  host: s-kv-center-z22.officekiev.fozzy.lan
+  port: 5672
+  vhost: aOSimulation
+  user: jAOSimulationClient
+  pwd: '1123581321'
