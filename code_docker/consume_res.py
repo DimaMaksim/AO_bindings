@@ -14,8 +14,7 @@ channel.exchange_declare(exchange='direct_logs', exchange_type='direct')
 result = channel.queue_declare(queue='', exclusive=True)
 queue_name = result.method.queue
 
-
-channel.queue_bind( exchange='direct_logs', queue=queue_name, routing_key='current')
+channel.queue_bind( exchange='direct_logs', queue=queue_name, routing_key='filialdone')
 def callback(ch, method, properties, body):
     mes=json.loads(body)
     print(mes)

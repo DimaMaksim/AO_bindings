@@ -8,16 +8,17 @@ import pickle
 import json
 import pika
 import yaml
+from multiprocessing import Pool
 
 pd.options.mode.chained_assignment = None
 with open("config.yaml") as f:
     config=yaml.full_load(f)
 
 credentials = pika.PlainCredentials(username=config['rabbit']['user'], password=config['rabbit']['pwd'])
-
 connection = pika.BlockingConnection(pika.ConnectionParameters(host=config['rabbit']['host'],port=5672,virtual_host=config['rabbit']['vhost'],  credentials=credentials))
 
 channel = connection.channel()
+channel.exchange_declare(exchange='direct_logs', exchange_type='direct')
 #channel.queue_declare(queue=config['rabbit']['in_queue'])
 #channel.queue_declare(queue=config['rabbit']['out_queue'])
 
@@ -49,7 +50,7 @@ class calculate():
                 ActivityId\
                 from [SalesHub.Dev].[DataHub].[v_SalesStores] \
                 where [Date]>={self.start} and [Date]<={self.end}\
-                and FilialId ={self.FilId}"
+                and FilialId ={self.FilId} and lagerid in (117,118,21)"
         df = pd.read_sql_query(sql,self.con_SalesHub)
         return df
     def get_rasf(self):
@@ -73,13 +74,12 @@ class calculate():
         return df
 
 
-import sys
+
 
 def forecast(FilId,start,end):
-
     a=calculate("'"+start+"'","'"+ end +"'",FilId)
     sales_all=a.get_sales()
-    print("sales_all OK")
+    print("sales_all OK, Filid: ",FilId)
     sales_all[['QtySales','StoreQtyDefault']]=sales_all[['QtySales','StoreQtyDefault']].fillna(0)
     sales_all.StoreQtyDefault[sales_all.StoreQtyDefault.values<0]=0
     sales_all=sales_all[sales_all.ActivityId.isnull()]
@@ -150,19 +150,32 @@ def forecast(FilId,start,end):
                     if clust=="2":
                         clust="1"
                 out=dict(lagerId=lager.item(),filialId=FilId,engineType=repl_dict[clust])
-                channel.basic_publish(exchange='', routing_key=config['rabbit']['out_queue'], body=json.dumps(out))
+                #channel.basic_publish(exchange='', routing_key=config['rabbit']['out_queue'], body=json.dumps(out))
+                channel.basic_publish(exchange='direct_logs', routing_key='current', body=json.dumps(out))
+    channel.basic_publish(exchange='direct_logs', routing_key='filialdone', body=json.dumps(f'filid {FilId} is done'))
     a.con_MD.close()
     a.con_SalesHub.close()
     a.con_Master.close()
     a.con_msp.close()
 
-start,end,fil="2020-03-20","2020-05-07",2407
-forecast(fil,start,end)
+#start,end,fil="2020-03-20","2020-05-07",2407
+#forecast(fil,start,end)
 
 
 
 def callback(ch, method, properties, body):
     mes=json.loads(body)
-    forecast(mes['filid'],mes['start'],mes['end'])
-#channel.basic_consume(queue=config['rabbit']['in_queue'], on_message_callback=callback, auto_ack=True)
-#channel.start_consuming()
+    n=mes['procnum']
+    start,end=mes['start'],mes['end']
+    args=[(filid,start,end) for filid in mes['filid']]
+    args_partition=[args[x:x+n] for x in range(0, len(args), n)]
+
+    #forecast(mes['filid'][0],start,end)
+    for arguments in args_partition:
+        with Pool(n) as p:
+            p.starmap(forecast,arguments)
+    #forecast(mes['filid'],mes['start'],mes['end'])
+
+if __name__=='__main__':
+    channel.basic_consume(queue=config['rabbit']['in_queue'], on_message_callback=callback, auto_ack=True)
+    channel.start_consuming()

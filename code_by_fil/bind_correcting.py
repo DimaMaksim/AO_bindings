@@ -222,11 +222,11 @@ args=[(filid,start,end) for filid in filials_4_2]
 home=r'c:\Users\dm.maksymenko\Python\AOEngine_bind\data'
 model=r'c:\Users\dm.maksymenko\Python\AOEngine_bind\code\model_5_filials.pickle'
 
-
+print(args)
 
 if __name__ == "__main__":
     #getSampleforTrain(2025,start,end)
-    CompAll(args)
+    #CompAll(args)
     #Compute(2269,start, end)
     #Concat()
 
