@@ -9,4 +9,4 @@ RUN ["apt-get", "update"]
 #RUN ["apt-get", "-y", "install", "vim"]
 
 
-CMD ["/bin/bash","-c","python3 bind_correcting.py & tail -f /dev/null"]
+CMD ["/bin/bash","-c","python3 bind_correcting_byfill.py & tail -f /dev/null"]

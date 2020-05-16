@@ -11,7 +11,6 @@ from pathlib import Path
 path=r'c:\Users\dm.maksymenko\Python\AOEngine_bind\data\temp'
 names=[f for f in glob.glob(path+f"\\*.csv")]
 
-
 l_ok=[]
 for i,name in enumerate(names):
         #fil=Path(name).stem[-4:]
@@ -21,21 +20,22 @@ for i,name in enumerate(names):
         exec('del df')
 df_ok=pd.concat(l_ok)
 del l_ok
-
+  
 df_ok=df_ok.drop_duplicates()
 df_ok.rename(columns={'LagerId':'lagerId','FilId':'filialId','AOEngine':'engineType'},inplace=True)
-l=[2679,2275,2269,2268,2266,2265,2264,2262,2260,2256,2234,2231,2229,2226,2157,2156,2155,2052,2025,1998]
+l=[1991,2022,2069,2199,2407,2195,2201,2213,2216,2221,2257]
 
-df_prev=pd.read_csv(r'c:\Users\dm.maksymenko\Python\AOEngine_bind\data\loads\concated_plus_20.csv',sep=';')
+df_prev=pd.read_csv(r'c:\Users\dm.maksymenko\Python\AOEngine_bind\data\loads\concated_plus_80.csv',sep=';')
 df_prev_cut=df_prev[~df_prev.filialId.isin(l)]
-df_prev_cut.filialId.value_counts()
+len(df_prev_cut.filialId.unique())
+len(df_prev.filialId.unique())
 
 
-df_conc=pd.concat([df_prev_cut,df_ok])
+df_conc=pd.concat([df_prev,df_ok])
 
 df_conc=df_conc.drop_duplicates()
-len(set(df_conc.filialId.values.tolist()))
-df_conc.to_csv(r'c:\Users\dm.maksymenko\Python\AOEngine_bind\data\loads\concated_plus_40.csv',index=False,sep=';')
+len(df_conc.filialId.unique())
+df_conc.to_csv(r'c:\Users\dm.maksymenko\Python\AOEngine_bind\data\loads\concated_plus_95.csv',index=False,sep=';')
 
 #%% выбор элитки
 import pyodbc
@@ -74,7 +74,7 @@ filials=[1991,2199,2022,2069,2407,\
 
 
 temp=[]
-for fil in filials:
+for fil in filials: 
     df=get_aoengine_name(fil,conn)
     df['filid']=fil
     df_loc=df[df.engintype.str.strip()=='AOEngine05']
@@ -107,7 +107,7 @@ for i in (0,1,2,3,4):
     a=df.iloc[i*k:(i+1)*k,:]
     a.to_csv(path+f'\\part_{i}.csv',sep=';',index=False)
 
-
+    
 
 #%% слияние
 
@@ -123,19 +123,19 @@ path=r'c:\Users\dm.maksymenko\Python\AOEngine_bind\data\temp\for_concat'
 names=[f for f in glob.glob(path+f"\\*.csv")]
 l_ok=[]
 for i,name in enumerate(names):
-
+        
         df=pd.read_csv(name,sep=";")
         print(len(df))
         l_ok.append(df)
         exec('del df')
 df_ok=pd.concat(l_ok)
 del l_ok
-
+   
 
 df_ok=df_ok.drop_duplicates()
 df_ok.to_csv(path+'\\concated_0805.csv',index=False,sep=';')
-
-
+    
+    
 
 
 

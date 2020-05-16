@@ -8,14 +8,17 @@ import pickle
 import json
 import pika
 import yaml
-from multiprocessing import Pool
+
+#from krb5 import do_kinit_w_keytab
+#do_kinit_w_keytab(uid='j-prod-seasonal', realm='OFFICEKIEV.FOZZY.LAN')
 
 pd.options.mode.chained_assignment = None
 with open("config.yaml") as f:
     config=yaml.full_load(f)
 
 credentials = pika.PlainCredentials(username=config['rabbit']['user'], password=config['rabbit']['pwd'])
-connection = pika.BlockingConnection(pika.ConnectionParameters(host=config['rabbit']['host'],port=5672,virtual_host=config['rabbit']['vhost'],  credentials=credentials))
+connection = pika.BlockingConnection(pika.ConnectionParameters(host=config['rabbit']['host'],\
+            port=5672,virtual_host=config['rabbit']['vhost'],  credentials=credentials,heartbeat=0))
 
 channel = connection.channel()
 channel.exchange_declare(exchange='direct_logs', exchange_type='direct')
@@ -32,7 +35,8 @@ class calculate():
         self.FilId=FilId
         self.driver='{ODBC Driver 17 for SQL Server}'
         self.con_MD=pyodbc.connect(driver=self.driver,server=self.server,database="4t.dev",uid='j-gb-client',pwd='Mb1ygZywkGxi8ZQLbVeb')
-        self.con_SalesHub = pyodbc.connect(DRIVER=self.driver,server=self.server,DATABASE='SalesHub.Dev',UID='j-gb-client',PWD='Mb1ygZywkGxi8ZQLbVeb')
+        #self.con_SalesHub = pyodbc.connect(DRIVER=self.driver,server=self.server,DATABASE='SalesHub.Dev',UID='j-gb-client',PWD='Mb1ygZywkGxi8ZQLbVeb')
+        self.con_SalesHub = pyodbc.connect(DRIVER=self.driver,server=self.server,Trusted_Connection='yes')
         self.con_Master = pyodbc.connect(DRIVER=self.driver,server=self.server,DATABASE='MasterData',UID='j-gb-client',PWD='Mb1ygZywkGxi8ZQLbVeb')
         self.con_msp = pyodbc.connect(driver=self.driver,server='kvcen15-sqls003.officekiev.fozzy.lan\heavy003',database='dwhclientAnalytics',\
                     uid='j-importOrders-controller',pwd='Mb1ygZywkGxi8ZQLbVeb')
@@ -48,9 +52,9 @@ class calculate():
                 StoreQtyDefault,\
                 PriceOut,\
                 ActivityId\
-                from [SalesHub.Dev].[DataHub].[v_SalesStores] \
+                from [SalesHub.Dev].[DataHub].[SalesStores] s with (nolock, INDEX(pk_SalesStores)) \
                 where [Date]>={self.start} and [Date]<={self.end}\
-                and FilialId ={self.FilId} and lagerid in (117,118,21)"
+                and FilialId ={self.FilId}"# and lagerid in (117,118,21,55)"
         df = pd.read_sql_query(sql,self.con_SalesHub)
         return df
     def get_rasf(self):
@@ -78,6 +82,7 @@ class calculate():
 
 def forecast(FilId,start,end):
     a=calculate("'"+start+"'","'"+ end +"'",FilId)
+    print(FilId)
     sales_all=a.get_sales()
     print("sales_all OK, Filid: ",FilId)
     sales_all[['QtySales','StoreQtyDefault']]=sales_all[['QtySales','StoreQtyDefault']].fillna(0)
@@ -85,10 +90,10 @@ def forecast(FilId,start,end):
     sales_all=sales_all[sales_all.ActivityId.isnull()]
     lagers=sales_all.lagerid.unique()
     lagers=pd.DataFrame(data=lagers,columns=['lagerid'])
-    msp_all=a.get_mspbyFil()
+
     ssl_all=a.get_ssl()
     rasf_all=a.get_rasf()
-
+    msp_all=a.get_mspbyFil()
     macro_all=a.get_macro_godn()
     lagers_info=lagers.merge(msp_all,how='left',on='lagerid')
     lagers_info=lagers_info.merge(ssl_all,how='left',on='lagerid')
@@ -113,13 +118,11 @@ def forecast(FilId,start,end):
     k=0
 
     for lager in lagers:
-        k+=1;print(FilId,k)
+        k+=1
+        #print(FilId,k)
         smallsales=0
         data=sales_all[sales_all.lagerid==lager].values
         sal,stock,price=data[:,1],data[:,2],data[:,3]
-        #data0[['QtySales','StoreQtyDefault']]=data0[['QtySales','StoreQtyDefault']].fillna(0)
-        #data0.StoreQtyDefault[data0.StoreQtyDefault.values<0]=0
-        #data=data0[data0.ActivityId.isnull()].values
 
         if len(data)>15:
             SalesQuantReal_mean=sal.mean()
@@ -165,16 +168,26 @@ def forecast(FilId,start,end):
 
 def callback(ch, method, properties, body):
     mes=json.loads(body)
-    n=mes['procnum']
+
+    #filid,start,end=mes['filid'],mes['start'],mes['end']
+    #forecast(filid,start,end)
+    #args=[(filid,start,end) for filid in mes['filid']]
+    #args_partition=[args[x:x+n] for x in range(0, len(args), n)]
+
+    #for arguments in args:
+        #forecast(*arguments)
+    #forecast(mes['filid'],mes['start'],mes['end'])
+
+
+
     start,end=mes['start'],mes['end']
     args=[(filid,start,end) for filid in mes['filid']]
-    args_partition=[args[x:x+n] for x in range(0, len(args), n)]
+    #args_partition=[args[x:x+n] for x in range(0, len(args), n)]
 
-    #forecast(mes['filid'][0],start,end)
-    for arguments in args_partition:
-        with Pool(n) as p:
-            p.starmap(forecast,arguments)
+    for arguments in args:
+        forecast(*arguments)
     #forecast(mes['filid'],mes['start'],mes['end'])
+
 
 if __name__=='__main__':
     channel.basic_consume(queue=config['rabbit']['in_queue'], on_message_callback=callback, auto_ack=True)

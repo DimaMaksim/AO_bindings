@@ -13,14 +13,14 @@ def updateSQL(filename):
                                      'DATABASE=AOForecast;'
                                      'Trusted_Connection=yes')
     engineSQL = create_engine('mssql+pyodbc:///?odbc_connect={}'.format(PARAMS))
-    df=pd.read_csv(path+'\\concated_plus_80.csv',sep=";")
+    df=pd.read_csv(path+'\\concated_plus_95.csv',sep=";")
     #df=df.iloc[:100,:]
     print(len(df))
 
     with engineSQL.begin() as connection:
         # delete table before insert
         connection.execute('delete from AO.ForecastTypes')
-        print("GO
+        
         df.to_sql(name='ForecastTypes',
                 con=connection,
                 schema='AO',
@@ -28,7 +28,7 @@ def updateSQL(filename):
                 index=True,          # insert pandas indices?
                 index_label='No',
                 method='multi',
-                chunksize=100,
+                chunksize=1000,
                 dtype={'lagerId':sqlalchemy.types.INTEGER(),'filialId':sqlalchemy.types.INTEGER(),'engineType':sqlalchemy.types.NVARCHAR(length=50)}
                 )
 

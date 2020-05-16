@@ -8,16 +8,17 @@ with open("config.yaml") as f:
 
 credentials = pika.PlainCredentials(username=config['rabbit']['user'], password=config['rabbit']['pwd'])
 connection = pika.BlockingConnection(pika.ConnectionParameters(host=config['rabbit']['host'],\
-                            port=config['rabbit']['port'],virtual_host=config['rabbit']['vhost'],  credentials=credentials))
+                            port=config['rabbit']['port'],virtual_host=config['rabbit']['vhost'], credentials=credentials))
 channel = connection.channel()
 #channel.queue_declare(queue=config['rabbit']['in_queue'],durable=True)
 
 
 
-filials=[2016,2407,2024,2016,2023,2024,2056,2113,2132,2115,2123,2122,2134,2481,2114,2133,2673,2112,2131,2151,2170,2154,2184]
-start,end,n = "2020-03-15","2020-05-05",4
+filials=[2264,2269,2265,2226,2234,2229,2679,2256,2268,2257,\
+        2266,2262,2275,2260,2231,2213,2221,2195,2201,2216]
+start,end = "2020-03-26","2020-05-14"
 #for fil in filials:
-mes=dict(filid=filials,start=start,end=end,procnum=n)
+mes=dict(filid=filials,start=start,end=end)
 channel.basic_publish(exchange='',routing_key=config['rabbit']['in_queue'],body=json.dumps(mes))
 
 connection.close()

@@ -17,7 +17,8 @@ class calculate():
         self.FilId=FilId
         self.driver='{ODBC Driver 17 for SQL Server}'
         self.con_MD=pyodbc.connect(driver=self.driver,server=self.server,database="4t.dev",uid='j-gb-client',pwd='Mb1ygZywkGxi8ZQLbVeb')
-        self.con_SalesHub = pyodbc.connect(DRIVER=self.driver,server=self.server,DATABASE='SalesHub.Dev',UID='j-gb-client',PWD='Mb1ygZywkGxi8ZQLbVeb')
+        #self.con_SalesHub = pyodbc.connect(DRIVER=self.driver,server=self.server,DATABASE='SalesHub.Dev',UID='j-gb-client',PWD='Mb1ygZywkGxi8ZQLbVeb')
+        self.con_SalesHub = pyodbc.connect(DRIVER=self.driver,server=self.server,Trusted_Connection='yes')
         self.con_Master = pyodbc.connect(DRIVER=self.driver,server=self.server,DATABASE='MasterData',UID='j-gb-client',PWD='Mb1ygZywkGxi8ZQLbVeb')
         self.con_msp = pyodbc.connect(driver=self.driver,server='kvcen15-sqls003\heavy003',database='dwhclientAnalytics',\
                     uid='j-importOrders-controller',pwd='Mb1ygZywkGxi8ZQLbVeb')
@@ -34,7 +35,7 @@ class calculate():
                 StoreQtyDefault,\
                 PriceOut,\
                 ActivityId\
-                from [SalesHub.Dev].[DataHub].[v_SalesStores] \
+                from [SalesHub.Dev].[DataHub].[SalesStores] s with (nolock, INDEX(pk_SalesStores))\
                 where [Date]>={self.start} and [Date]<={self.end}\
                 and FilialId ={self.FilId}"
         df = pd.read_sql_query(sql,self.con_SalesHub)
@@ -185,7 +186,7 @@ def Compute(FilId,start,end):
     trained.FilId=trained.FilId.astype(int)
     print(f"Идет запись филиал {FilId} .....")
     #plc=r'C:\Users\dm.maksymenko\Python\Flask_edition\5filials\res\Recalcmodel\testing pilot\data'
-    trained.to_csv(home+f"\\temp\\id_test_{FilId}.csv",sep=';',index=False)
+    trained.to_csv(home+f"\\temp\\id_{FilId}.csv",sep=';',index=False)
 
 def Concat():
     #plc=r'C:\Users\dm.maksymenko\Python\Flask_edition\5filials\res\Recalcmodel\testing pilot\data'
@@ -213,20 +214,35 @@ def CompAll(args):
 #%%
 from multiprocessing import Pool
 
-filials_4_1=[2016,2023,2024,2056,2113,2132,2115,2123,2122,2134]
-filials_4_2=[2481,2114,2133,2673,2112,2131,2151,2170,2154,2184]
+f0=[1991,2199,2022,2069,2407, 1998,2025,2052,2155,2156,2157]
+f1=[2264,2269,2265,2226,2234,2229,2679,2256,2268,2257]
+f2=[2266,2262,2275,2260,2231,2213,2221,2195,2201,2216]
 
-start="2020-03-20"; end="2020-05-10"
-args=[(filid,start,end) for filid in filials_4_2]
+f3=[2212,2236,2238,2243,2237,2240,2241,2246,2220,2118]
+f4=[2116,2090,2007,1992,2027,2732,2020,2019,2029,2008]
+f5=[2057,2010,2034,2072,2783,2734,2017,2040,2014,2000]
+f6=[2005,1990,2054,2001,2030,2733,2031,1995,2578,2382]
+f7=[2016,2023,2024,2056,2113,2132,2115,2123,2122,2134]
+f8=[2481,2114,2133,2673,2112,2131,2151,2170,2154,2184]
+f9=[2290,2161,2145,2186,2153,2648,2746,2176,2183,2125,2129,2105,2126,2077,2187]
+#%%
+
+
+
+
+#%%
+
+start,end="2020-04-01","2020-05-15"
+args=[(filid,start,end) for filid in f7+f8+f9]
 #PrevFileName="AOEngines_20200506194824"
 home=r'c:\Users\dm.maksymenko\Python\AOEngine_bind\data'
 model=r'c:\Users\dm.maksymenko\Python\AOEngine_bind\code\model_5_filials.pickle'
 
-print(args)
+
 
 if __name__ == "__main__":
     #getSampleforTrain(2025,start,end)
-    #CompAll(args)
+    CompAll(args)
     #Compute(2269,start, end)
     #Concat()
 
